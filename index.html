@@ -1294,6 +1294,34 @@
             }
         }
     }
+    * Add this at the end of the style section */
+    .week-badge-clickable {
+      cursor: pointer;
+      transition: all calc(0.3s * var(--animation-speed)) cubic-bezier(0.4, 0, 0.2, 1);
+      user-select: none;
+    }
+    
+    .week-badge-clickable:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6), 0 0 15px rgba(59, 130, 246, 0.3);
+      background: rgba(59, 130, 246, 0.15);
+      border-color: var(--accent-primary);
+    }
+    
+    .week-badge-clickable.active {
+      background: var(--accent-primary);
+      color: white;
+      border-color: var(--accent-primary);
+    }
+    
+    .week-viewing-indicator {
+      font-size: 0.65rem;
+      color: var(--accent-secondary);
+      font-weight: 600;
+      margin-top: 0.25rem;
+      opacity: 0.9;
+      height: 16px;
+    }
   </style>
 </head>
 <body class="font-sans">
@@ -1865,10 +1893,12 @@ let customBookmarks = JSON.parse(localStorage.getItem('mhs_custom_bookmarks')) |
   { name: "Gemini AI", url: "https://gemini.google.com/app" },
   { name: "Schoology", url: "https://minnetonka.schoology.com" },
   { name: "Gmail", url: "https://mail.google.com" }
-];
+  // Add these variables with the other state variables
+let currentWeekOverride = localStorage.getItem('mhs_week_override') || 'B'; // Default to Week B
+let isViewingAlternateWeek = localStorage.getItem('mhs_viewing_alternate_week') === 'true';
 let lastCelebratedPeriodId = ""; 
 let viewingDate = new Date();
-
+];
 // Custom theme variables
 let customPrimary = localStorage.getItem('mhs_custom_primary') || '#3b82f6';
 let customSecondary = localStorage.getItem('mhs_custom_secondary') || '#8b5cf6';
@@ -2313,7 +2343,8 @@ function createParticles() {
       color: `rgba(${Math.floor(Math.random() * 100 + 155)}, ${Math.floor(Math.random() * 100 + 155)}, 255, ${Math.random() * 0.3 + 0.1})`
     });
   }
-}
+} 
+  //go 
 
 function animateParticles(timestamp) {
   if (!lastTime) lastTime = timestamp;
@@ -2734,17 +2765,26 @@ function changeDate(days) {
   }, 100);
 }
 
-function goToToday() {
+// Add this new function to toggle week view
+function toggleWeekView() {
+  isViewingAlternateWeek = !isViewingAlternateWeek;
+  
+  // Save preference
+  if (isViewingAlternateWeek) {
+    localStorage.setItem('mhs_viewing_alternate_week', 'true');
+  } else {
+    localStorage.removeItem('mhs_viewing_alternate_week');
+  }
+  
+  // Animate the change
   animateDaySwitch();
   
   setTimeout(() => {
-    viewingDate = new Date();
     update();
-    updateSelectedDayIndicator();
   }, 100);
 }
 
-// Init UI
+// Update this section in the DOMContentLoaded function
 document.addEventListener('DOMContentLoaded', function() {
   // Initialize loading screen
   initLoadingScreen();
@@ -2786,6 +2826,18 @@ document.addEventListener('DOMContentLoaded', function() {
       onFrameLoad();
     }
   }, 6000);
+  
+  // Initialize week badge as clickable
+  setTimeout(() => {
+    const weekBadge = document.getElementById('week-badge');
+    if (weekBadge) {
+      weekBadge.classList.add('week-badge-clickable');
+      if (!weekBadge.dataset.hasListener) {
+        weekBadge.addEventListener('click', toggleWeekView);
+        weekBadge.dataset.hasListener = 'true';
+      }
+    }
+  }, 100);
 });
 
 let visits = parseInt(localStorage.getItem('mhs_visit_count') || "0") + 1;
@@ -2940,18 +2992,68 @@ function celebrate() {
   setTimeout(() => toast.classList.remove('show'), 6000);
 }
 
-// UPDATED: Main update function with no-school day check
+/// UPDATED: Main update function with no-school day check AND week switching functionality
 function update() {
   const now = new Date();
   const isToday = now.toDateString() === viewingDate.toDateString();
   const dayName = viewingDate.toLocaleString('en-US', { weekday: 'long' });
-  const weekRefDate = new Date(2025, 8, 1);
+  
+  // Calculate the actual week based on date
+  const weekRefDate = new Date(2025, 8, 1); // September 1, 2025
   const weekNum = Math.floor((viewingDate - weekRefDate) / (7 * 24 * 60 * 60 * 1000));
-  const week = weekNum % 2 === 0 ? "Week A" : "Week B";
+  const actualWeek = weekNum % 2 === 0 ? "Week A" : "Week B";
+  
+  // Use the override if user has clicked to view alternate week
+  let displayWeek = actualWeek;
+  let weekBadgeText = actualWeek;
+  
+  if (isViewingAlternateWeek) {
+    // Show opposite week
+    displayWeek = actualWeek === "Week A" ? "Week B" : "Week A";
+    weekBadgeText = `${actualWeek} (viewing ${displayWeek})`;
+  } else {
+    weekBadgeText = actualWeek;
+  }
+  
+  // Apply override if set (for initial Week B default)
+  if (currentWeekOverride === 'B' && !isViewingAlternateWeek) {
+    displayWeek = "Week B";
+    weekBadgeText = "Week B";
+  } else if (currentWeekOverride === 'A' && !isViewingAlternateWeek) {
+    displayWeek = "Week A";
+    weekBadgeText = "Week A";
+  }
+  
+  // Update the week badge with clickable styling and indicator
+  const weekBadge = document.getElementById('week-badge');
+  weekBadge.textContent = weekBadgeText;
+  weekBadge.classList.add('week-badge-clickable');
+  
+  // Add click event listener to the week badge if not already added
+  if (!weekBadge.dataset.hasListener) {
+    weekBadge.addEventListener('click', toggleWeekView);
+    weekBadge.dataset.hasListener = 'true';
+  }
+  
+  // Add a small indicator below the badge to show viewing status
+  let weekIndicator = document.getElementById('week-view-indicator');
+  if (!weekIndicator) {
+    weekIndicator = document.createElement('div');
+    weekIndicator.id = 'week-view-indicator';
+    weekIndicator.className = 'week-viewing-indicator';
+    weekBadge.parentNode.insertBefore(weekIndicator, weekBadge.nextSibling);
+  }
+  
+  if (isViewingAlternateWeek) {
+    weekIndicator.textContent = `Viewing ${displayWeek} (normally ${actualWeek})`;
+    weekBadge.classList.add('active');
+  } else {
+    weekIndicator.textContent = '';
+    weekBadge.classList.remove('active');
+  }
+  
   const currentTime = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
 
-  document.getElementById('week-badge').textContent = week;
-  
   const timerWrapper = document.getElementById('timer-wrapper');
   if (isToday) {
     timerWrapper.classList.remove('hidden');
@@ -2977,7 +3079,8 @@ function update() {
     document.getElementById('lunch-selector').style.display = 'block';
   }
 
-  const daySchedule = SCHEDULE[week][dayName];
+  // Use displayWeek instead of week variable
+  const daySchedule = SCHEDULE[displayWeek][dayName];
   if (!daySchedule) {
     document.getElementById('current-period').textContent = "Weekend";
     document.getElementById('schedule-body').innerHTML = `<tr><td colspan="2" style="text-align:center; padding: 3rem; color: var(--text-muted);">No school scheduled for ${dayName}.</td></tr>`;
@@ -2986,7 +3089,7 @@ function update() {
 
   let timeline = [...daySchedule.periods];
   
-  if (week === "Week B" && dayName === "Thursday") {
+  if (displayWeek === "Week B" && dayName === "Thursday") {
     const lunchData = daySchedule.lunch[selectedLunch];
     
     if (selectedLunch === "1") {
@@ -3007,7 +3110,7 @@ function update() {
       timeline.push({ name: 'Anchor Time', time: daySchedule.anchors[0] });
     }
   } 
-  else if (week === "Week B" && dayName === "Wednesday") {
+  else if (displayWeek === "Week B" && dayName === "Wednesday") {
     const lunchData = daySchedule.lunch[selectedLunch];
     
     if (selectedLunch === "1") {
@@ -3043,7 +3146,7 @@ function update() {
     timeline.push({ name: 'Period 5', time: daySchedule.period5 });
     
     if (daySchedule.anchors && daySchedule.anchors.length > 0) {
-      if ((week === "Week A" && dayName === "Thursday")) {
+      if ((displayWeek === "Week A" && dayName === "Thursday")) {
         timeline.push({ name: 'Anchor Time', time: daySchedule.anchors[0] });
         timeline.push({ name: 'Period 6', time: daySchedule.period6 });
       } else {
@@ -3114,20 +3217,6 @@ function update() {
     updateTimerEffects(null, null);
   }
 }
-
-// Lunch selection event listeners
-document.querySelectorAll('input[name="lunch"]').forEach(r => {
-  r.addEventListener('change', e => { 
-    selectedLunch = e.target.value; 
-    localStorage.setItem('mhs_lunch_choice', selectedLunch); 
-    update(); 
-  });
-});
-
-// Initialize
-setInterval(update, 1000);
-update();
-updateSelectedDayIndicator();
 </script>
 </body>
 </html>
