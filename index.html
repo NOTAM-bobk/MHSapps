@@ -855,6 +855,15 @@
       text-transform: uppercase; 
       margin-bottom: 0.5rem; 
       box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+      cursor: pointer; /* ADDED: Make badge clickable */
+      transition: all calc(0.3s * var(--animation-speed)) cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .badge:hover { /* ADDED: Hover effect for badge */
+      background: rgba(59, 130, 246, 0.2); 
+      border-color: var(--accent-primary);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(59, 130, 246, 0.4), 0 0 15px rgba(59, 130, 246, 0.3);
     }
     
     h1 { 
@@ -1395,7 +1404,7 @@
       </button>
     </div>
 
-    <div class="badge" id="week-badge">Loading...</div>
+    <div class="badge" id="week-badge" onclick="toggleWeek()" title="Click to switch between Week A and Week B">Loading...</div>
     <h1 id="main-title">MHS Schedule</h1>
     
     <!-- Updated: Bubble glass effect for day and time - Shows full date and time with seconds -->
@@ -1869,6 +1878,10 @@ let customBookmarks = JSON.parse(localStorage.getItem('mhs_custom_bookmarks')) |
 let lastCelebratedPeriodId = ""; 
 let viewingDate = new Date();
 
+// NEW: Week state variables
+let currentWeek = localStorage.getItem('mhs_current_week') || "Week B"; // Default to Week B as requested
+let manualWeekOverride = localStorage.getItem('mhs_manual_week_override') === 'true';
+
 // Custom theme variables
 let customPrimary = localStorage.getItem('mhs_custom_primary') || '#3b82f6';
 let customSecondary = localStorage.getItem('mhs_custom_secondary') || '#8b5cf6';
@@ -1905,6 +1918,89 @@ let loadingTimeout = null;
 
 // AI Chat state
 let isChatOpen = false;
+
+// NEW: Function to calculate week based on date
+function calculateWeekFromDate(date) {
+  // Use September 1, 2025 as the reference start date (first week of school)
+  const referenceDate = new Date(2025, 8, 1); // September 1, 2025 (month is 0-indexed)
+  
+  // Calculate the difference in milliseconds
+  const diffInMs = date - referenceDate;
+  
+  // Convert to days
+  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+  
+  // Calculate which week we're in (0-indexed)
+  const weekIndex = Math.floor(diffInDays / 7);
+  
+  // Even week index = Week A, Odd week index = Week B
+  // Since we want the first week (Sept 1-5) to be Week A
+  return weekIndex % 2 === 0 ? "Week A" : "Week B";
+}
+
+// NEW: Function to get the current week (either calculated or manual override)
+function getCurrentWeek() {
+  if (manualWeekOverride) {
+    return currentWeek;
+  } else {
+    const calculatedWeek = calculateWeekFromDate(new Date());
+    return calculatedWeek;
+  }
+}
+
+// NEW: Function to toggle between Week A and Week B
+function toggleWeek() {
+  // Toggle the week
+  currentWeek = currentWeek === "Week A" ? "Week B" : "Week A";
+  
+  // Set manual override to true when user manually toggles
+  manualWeekOverride = true;
+  
+  // Save to localStorage
+  localStorage.setItem('mhs_current_week', currentWeek);
+  localStorage.setItem('mhs_manual_week_override', 'true');
+  
+  // Update the badge and schedule
+  updateWeekBadge();
+  update();
+  
+  // Show a toast notification
+  const toast = document.getElementById('toast-notification');
+  toast.textContent = `Switched to ${currentWeek}`;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// NEW: Function to update week badge display
+function updateWeekBadge() {
+  const weekBadge = document.getElementById('week-badge');
+  if (weekBadge) {
+    weekBadge.textContent = currentWeek;
+    
+    // Add indicator if manually overridden
+    if (manualWeekOverride) {
+      weekBadge.title = `Manual: ${currentWeek} (click to switch to ${currentWeek === "Week A" ? "Week B" : "Week A"})`;
+      weekBadge.style.background = 'rgba(245, 158, 11, 0.2)'; // Orange tint for manual override
+      weekBadge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+      weekBadge.style.color = '#f59e0b';
+    } else {
+      weekBadge.title = `Auto: ${currentWeek} (click to switch to ${currentWeek === "Week A" ? "Week B" : "Week A"})`;
+      weekBadge.style.background = 'rgba(59, 130, 246, 0.1)';
+      weekBadge.style.borderColor = 'rgba(59, 130, 246, 0.2)';
+      weekBadge.style.color = 'var(--accent-primary)';
+    }
+  }
+}
+
+// NEW: Function to reset to automatic week calculation
+function resetToAutoWeek() {
+  manualWeekOverride = false;
+  localStorage.setItem('mhs_manual_week_override', 'false');
+  currentWeek = calculateWeekFromDate(new Date());
+  localStorage.setItem('mhs_current_week', currentWeek);
+  updateWeekBadge();
+  update();
+}
 
 // Initialize EmailJS once (with your public key)
 (function() {
@@ -2741,6 +2837,9 @@ function goToToday() {
     viewingDate = new Date();
     update();
     updateSelectedDayIndicator();
+    
+    // NEW: When going to today, reset to auto week calculation
+    resetToAutoWeek();
   }, 100);
 }
 
@@ -2757,6 +2856,9 @@ document.addEventListener('DOMContentLoaded', function() {
   updateSetting('timeformat', timeFormat);
   updateSetting('motion', motionSetting);
   updateSetting('background-effect', backgroundEffect);
+  
+  // NEW: Initialize week display
+  updateWeekBadge();
   
   renderBookmarks();
   getIPAddress();
@@ -2940,17 +3042,19 @@ function celebrate() {
   setTimeout(() => toast.classList.remove('show'), 6000);
 }
 
-// UPDATED: Main update function with no-school day check
+// UPDATED: Main update function with no-school day check and week switching
 function update() {
   const now = new Date();
   const isToday = now.toDateString() === viewingDate.toDateString();
   const dayName = viewingDate.toLocaleString('en-US', { weekday: 'long' });
-  const weekRefDate = new Date(2025, 8, 1);
-  const weekNum = Math.floor((viewingDate - weekRefDate) / (7 * 24 * 60 * 60 * 1000));
-  const week = weekNum % 2 === 0 ? "Week A" : "Week B";
+  
+  // NEW: Use the current week (either calculated or manually set)
+  const week = currentWeek;
+  
   const currentTime = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
 
-  document.getElementById('week-badge').textContent = week;
+  // NEW: Update week badge display
+  updateWeekBadge();
   
   const timerWrapper = document.getElementById('timer-wrapper');
   if (isToday) {
