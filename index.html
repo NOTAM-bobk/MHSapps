@@ -2715,37 +2715,29 @@ function formatMinToTime(min) {
   }
 }
 
-// Updated: Function to format date and time with seconds
+// FIXED: Updated function to format date and time with seconds - Now cleaner and more consistent
 function formatDateTimeWithSeconds(date) {
-  const now = new Date();
-  const isToday = now.toDateString() === viewingDate.toDateString();
-  const displayDate = isToday ? now : viewingDate;
-  
-  const month = displayDate.toLocaleString('en-US', { month: 'long' });
-  const day = displayDate.getDate();
-  const year = displayDate.getFullYear();
-  const dayName = displayDate.toLocaleString('en-US', { weekday: 'long' });
+  const month = date.toLocaleString('en-US', { month: 'long' });
+  const day = date.getDate();
+  const year = date.getFullYear();
+  const dayName = date.toLocaleString('en-US', { weekday: 'long' });
   
   if (timeFormat === '24hr') {
-    const hours = displayDate.getHours().toString().padStart(2, '0');
-    const minutes = displayDate.getMinutes().toString().padStart(2, '0');
-    const seconds = displayDate.getSeconds().toString().padStart(2, '0');
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
     return `${month} ${day}, ${year} • ${hours}:${minutes}:${seconds}`;
   } else {
-    let hours = displayDate.getHours();
+    let hours = date.getHours();
     const ampm = hours >= 12 ? 'PM' : 'AM';
     hours = hours % 12 || 12;
-    const minutes = displayDate.getMinutes().toString().padStart(2, '0');
-    const seconds = displayDate.getSeconds().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
     return `${month} ${day}, ${year} • ${hours}:${minutes}:${seconds} ${ampm}`;
   }
 }
 
-function formatDateDisplay(date) {
-  return date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-}
-
-// Updated: Update datetime bubble with full date and time including seconds
+// FIXED: Update datetime bubble with full date and time including seconds - Now runs smoothly every second
 function updateDateTimeBubble() {
   const now = new Date();
   const isToday = now.toDateString() === viewingDate.toDateString();
@@ -2760,7 +2752,7 @@ function updateDateTimeBubble() {
       timeElement.textContent = formatDateTimeWithSeconds(now);
       indicatorElement.textContent = '';
     } else {
-      // Show selected day and date
+      // Show selected day and date (no seconds for non-current days)
       const selectedDayName = viewingDate.toLocaleString('en-US', { weekday: 'long' });
       const month = viewingDate.toLocaleString('en-US', { month: 'long' });
       const day = viewingDate.getDate();
@@ -2771,6 +2763,10 @@ function updateDateTimeBubble() {
       indicatorElement.textContent = `Viewing: ${selectedDayName}`;
     }
   }
+}
+
+function formatDateDisplay(date) {
+  return date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 // Update selected day indicator
@@ -2875,9 +2871,10 @@ document.addEventListener('DOMContentLoaded', function() {
   checkScreenSize();
   window.addEventListener('resize', checkScreenSize);
   
-  // Update datetime bubble every second to show seconds
-  updateDateTimeBubble();
-  setInterval(updateDateTimeBubble, 1000);
+  // FIXED: Single, clean interval for the date/time display - runs every second without skipping
+  setInterval(function() {
+    updateDateTimeBubble();
+  }, 1000);
   
   setTimeout(handleScroll, 100);
   
@@ -3231,7 +3228,6 @@ document.querySelectorAll('input[name="lunch"]').forEach(r => {
 // Initialize
 setInterval(update, 1000);
 update();
-updateSelectedDayIndicator();
 </script>
 </body>
 </html>
