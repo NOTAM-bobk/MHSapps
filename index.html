@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>MHS Schedule</title>
+
+  <!-- PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black"/>
+  <meta name="apple-mobile-web-app-title" content="MHS"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="theme-color" content="#0a0a0a"/>
+  <link rel="manifest" href="manifest.json"/>
+
+  <!-- Icons — uses your icon.png file -->
+  <link rel="apple-touch-icon" href="icon.png"/>
+  <link rel="icon" type="image/png" href="icon.png"/>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet"/>
+
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body class="theme-dark font-sans mode-standard">
+
+<!-- ── LOADING ── -->
+<div id="loading-screen">
+  <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.5rem">
+    <div style="width:28px;height:28px;border:1px solid #2a2a2a;border-radius:6px;overflow:hidden;background:#111">
+      <img src="icon.png" alt="" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.innerHTML='<span style=font-family:monospace;font-weight:bold;font-size:16px;display:flex;align-items:center;justify-content:center;height:100%;color:#ededed>M</span>'"/>
+    </div>
+    <span style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#ededed;letter-spacing:-.01em">MHS Schedule</span>
+  </div>
+  <div class="load-bar"><div class="load-bar-inner"></div></div>
+  <div class="load-label" style="margin-top:.75rem">Loading schedule…</div>
+</div>
+
+<!-- ── TOAST ── -->
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- ── EXIT SIGN MODE ── -->
+<button id="exit-sign-btn" class="btn btn-ghost btn-sm" onclick="setSetting('mode','standard')" aria-label="Exit sign mode">
+  <svg class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+  Exit Sign Mode
+</button>
+
+<!-- ── HOME SCREEN PROMPT ── -->
+<div id="home-prompt" role="dialog" aria-modal="true" aria-label="Add to home screen">
+  <div class="home-prompt-card">
+    <div class="home-prompt-title">📱 Add to Home Screen</div>
+    <div class="home-prompt-body">Get quick fullscreen access — tap the share button and choose "Add to Home Screen".</div>
+    <div class="home-prompt-btns">
+      <button class="btn btn-primary" onclick="dismissHome(true)">Got it</button>
+      <button class="btn" onclick="dismissHome(false)">Remind me later</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── AI CHAT ── -->
+<button id="ai-chat-btn" aria-label="Open AI chat" onclick="toggleChat()">
+  <svg class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+  </svg>
+</button>
+
+<div id="chat-window" role="dialog" aria-modal="true" aria-label="AI Chat">
+  <div class="chat-head">
+    <span class="chat-head-title">NANOCHAT ASSISTANT</span>
+    <button class="btn btn-ghost btn-icon btn-sm" onclick="toggleChat()" aria-label="Close">
+      <svg class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="chat-body">
+    <div class="chat-loader" id="chat-loader">
+      <div class="dot-row">
+        <div class="chat-dot"></div>
+        <div class="chat-dot"></div>
+        <div class="chat-dot"></div>
+      </div>
+      <span class="chat-loader-text">LOADING INTERFACE</span>
+    </div>
+    <iframe id="chat-iframe" src="https://llm-chat-app-template2.sawyerbobk563.workers.dev" onload="chatLoaded()" title="NanoChat AI"></iframe>
+  </div>
+</div>
+
+<!-- ── MAIN APP ── -->
+<div id="app">
+
+  <!-- HEADER -->
+  <header class="site-header animate-in">
+    <div class="logo-mark">
+      <div class="logo-icon">
+        <img src="icon.png" alt="MHS" onerror="this.parentElement.innerHTML='<span style=font-family:monospace;font-weight:bold;display:flex;align-items:center;justify-content:center;height:100%;color:#ededed;font-size:14px>M</span>'"/>
+      </div>
+      <div>
+        <div class="logo-text">MHS SCHEDULE</div>
+        <div class="logo-sub">2025–2026 Academic Year</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <span id="week-badge" class="week-badge" onclick="toggleWeek()" title="Click to toggle week">
+        <span class="week-badge-dot"></span>
+        Week B
+      </span>
+      <button class="btn btn-sm" onclick="resetWeek()" title="Reset to auto week calculation">Auto</button>
+    </div>
+  </header>
+
+  <!-- DATE NAV -->
+  <nav class="date-nav animate-in-delay" aria-label="Date navigation">
+    <button class="btn btn-ghost btn-icon" onclick="changeDate(-1)" aria-label="Previous day">
+      <svg class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
+    </button>
+    <div class="date-nav-center">
+      <div class="date-nav-day" id="nav-day">Loading…</div>
+      <div class="date-nav-full" id="nav-date"></div>
+      <div class="date-nav-time" id="nav-time"></div>
+    </div>
+    <div style="display:flex;gap:.4rem;align-items:center">
+      <button class="btn btn-sm" onclick="goToToday()">Today</button>
+      <button class="btn btn-ghost btn-icon" onclick="changeDate(1)" aria-label="Next day">
+        <svg class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Viewing future indicator -->
+  <div id="viewing-indicator" style="display:none;text-align:center;padding:.4rem;font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.5rem">VIEWING NON-CURRENT DATE</div>
+
+  <!-- TIMER CARD -->
+  <div class="timer-card animate-in-delay2" id="timer-card">
+    <div class="timer-card-top">
+      <div>
+        <div class="timer-period-name">CURRENT PERIOD</div>
+        <div class="timer-period-label" id="timer-period">Loading…</div>
+      </div>
+      <div class="timer-value" id="timer-value">--:--</div>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+    <div class="timer-meta">
+      <span class="timer-label">TIME REMAINING</span>
+      <span class="timer-end-time" id="timer-end-time"></span>
+    </div>
+  </div>
+
+  <!-- NO SCHOOL -->
+  <div class="no-school-card animate-in-delay2" id="no-school" style="display:none">
+    <div class="no-school-label">NO SCHEDULE</div>
+    <div class="no-school-title">Weekend / No School</div>
+  </div>
+
+  <!-- SCHEDULE CARD -->
+  <div class="schedule-card animate-in-delay2" id="schedule-card">
+    <div class="schedule-header">
+      <span>Period</span>
+      <span>Time</span>
+    </div>
+    <div id="schedule-rows"></div>
+  </div>
+
+  <!-- LUNCH PICKER -->
+  <div class="lunch-section animate-in-delay3">
+    <div class="section-label">Lunch Selection</div>
+    <div class="lunch-grid">
+      <label class="lunch-option">
+        <input type="radio" name="lunch" value="1"/>
+        <span>4c — Lunch 1<small>Early Lunch</small></span>
+      </label>
+      <label class="lunch-option">
+        <input type="radio" name="lunch" value="2"/>
+        <span>4b — Lunch 2<small>Split Period 4</small></span>
+      </label>
+      <label class="lunch-option">
+        <input type="radio" name="lunch" value="3"/>
+        <span>4a — Lunch 3<small>Late Lunch</small></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- BOOKMARKS -->
+  <div class="collapse animate-in-delay3" id="collapse-bookmarks">
+    <button class="collapse-trigger" onclick="toggleCollapse('collapse-bookmarks')" aria-expanded="false">
+      <div class="collapse-trigger-left">
+        <svg class="collapse-trigger-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+        Quick Bookmarks
+      </div>
+      <svg class="collapse-arrow" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+    </button>
+    <div class="collapse-body">
+      <div class="bookmark-list" id="bookmark-list"></div>
+      <div class="bm-add-form">
+        <input id="bm-name" class="input" type="text" placeholder="Site name" autocomplete="off"/>
+        <input id="bm-url"  class="input" type="url"  placeholder="https://…" autocomplete="off"/>
+        <button class="btn btn-primary" onclick="addBookmark()">Add Bookmark</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="collapse animate-in-delay3" id="collapse-settings">
+    <button class="collapse-trigger" onclick="toggleCollapse('collapse-settings')" aria-expanded="false">
+      <div class="collapse-trigger-left">
+        <svg class="collapse-trigger-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+        Settings &amp; Customization
+      </div>
+      <svg class="collapse-arrow" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+    </button>
+    <div class="collapse-body">
+
+      <!-- Mode -->
+      <div class="settings-group">
+        <div class="settings-group-label">Display Mode</div>
+        <div class="pill-group">
+          <span class="pill active" data-group="pill-mode" data-val="standard" onclick="setSetting('mode','standard')">Standard</span>
+          <span class="pill" data-group="pill-mode" data-val="sign" onclick="setSetting('mode','sign')">Sign / TV</span>
+        </div>
+      </div>
+
+      <!-- Time format -->
+      <div class="settings-group">
+        <div class="settings-group-label">Time Format</div>
+        <div class="pill-group">
+          <span class="pill active" data-group="pill-timefmt" data-val="12hr" onclick="setSetting('timefmt','12hr')">12hr</span>
+          <span class="pill" data-group="pill-timefmt" data-val="24hr" onclick="setSetting('timefmt','24hr')">24hr</span>
+        </div>
+      </div>
+
+      <!-- Theme -->
+      <div class="settings-group">
+        <div class="settings-group-label">App Theme</div>
+        <div class="pill-group">
+          <span class="pill active" data-group="pill-theme" data-val="dark"  onclick="setSetting('theme','dark')">Dark</span>
+          <span class="pill" data-group="pill-theme" data-val="white" onclick="setSetting('theme','white')">Light</span>
+          <span class="pill" data-group="pill-theme" data-val="green" onclick="setSetting('theme','green')">Green</span>
+          <span class="pill" data-group="pill-theme" data-val="blue"  onclick="setSetting('theme','blue')">Blue</span>
+          <span class="pill" data-group="pill-theme" data-val="red"   onclick="setSetting('theme','red')">Red</span>
+          <span class="pill" data-group="pill-theme" data-val="custom" onclick="document.getElementById('theme-builder').style.display='block';setSetting('theme','custom')">Custom</span>
+        </div>
+        <!-- Custom theme builder -->
+        <div id="theme-builder" style="display:none;margin-top:.75rem;padding:.75rem;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md)">
+          <div class="settings-group-label" style="margin-bottom:.5rem">Custom Colors</div>
+          <div class="color-row">
+            <label>Accent</label>
+            <input type="color" id="cp-primary" value="#ededed"/>
+            <input type="text" id="cp-primary-text" placeholder="#ededed" maxlength="7"/>
+          </div>
+          <div class="color-row">
+            <label>Background</label>
+            <input type="color" id="cp-bg" value="#0a0a0a"/>
+            <input type="text" id="cp-bg-text" placeholder="#0a0a0a" maxlength="7"/>
+          </div>
+          <div style="display:flex;gap:.5rem;margin-top:.75rem">
+            <button class="btn btn-primary" style="flex:1" onclick="saveCustomTheme()">Save Theme</button>
+            <button class="btn" style="flex:1" onclick="document.getElementById('theme-builder').style.display='none'">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Font -->
+      <div class="settings-group">
+        <div class="settings-group-label">Font</div>
+        <div class="pill-group">
+          <span class="pill active" data-group="pill-font" data-val="sans"   onclick="setSetting('font','sans')">DM Sans</span>
+          <span class="pill" data-group="pill-font" data-val="mono"   onclick="setSetting('font','mono')">Mono</span>
+          <span class="pill" data-group="pill-font" data-val="serif"  onclick="setSetting('font','serif')">Serif</span>
+          <span class="pill" data-group="pill-font" data-val="system" onclick="setSetting('font','system')">System</span>
+        </div>
+      </div>
+
+      <!-- Celebrations -->
+      <div class="settings-group">
+        <div class="settings-group-label">Period End Celebrations</div>
+        <div class="pill-group">
+          <span class="pill active" data-group="pill-celebrate" data-val="on"  onclick="setSetting('celebrate',true)">On</span>
+          <span class="pill" data-group="pill-celebrate" data-val="off" onclick="setSetting('celebrate',false)">Off</span>
+        </div>
+      </div>
+
+      <!-- Push notifications -->
+      <div class="settings-group">
+        <div class="settings-group-label">Push Notifications</div>
+        <div class="notif-section">
+          <div class="notif-info">
+            <strong>Period alerts</strong>
+            <small>Get notified 1 min before each period ends</small>
+          </div>
+          <label class="notif-toggle" aria-label="Enable notifications">
+            <input type="checkbox" id="notif-toggle-input" onchange="requestPushPermission(this.checked)"/>
+            <div class="notif-toggle-track"></div>
+            <div class="notif-toggle-thumb"></div>
+          </label>
+        </div>
+        <button class="btn btn-sm mt-1" onclick="sendTestNotif()" style="margin-top:.5rem">Send Test Notification</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- RESOURCES -->
+  <div class="resources-row animate-in-delay3">
+    <button class="resource-btn rb-student" onclick="toggleResourceDropdown('rd-student')">
+      <svg class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+      Resources
+    </button>
+    <button class="resource-btn rb-bug" onclick="window.open('https://forms.gle/z7r6qN4gaCqVDruh8','_blank')">
+      <svg class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+      Bug Report
+    </button>
+    <button class="resource-btn rb-sites" onclick="window.open('https://expensive-maroon-hxm2enu89d.edgeone.app/','_blank')">
+      <svg class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+      Other Sites
+    </button>
+  </div>
+
+  <div class="resource-dropdown" id="rd-student">
+    <a href="https://www.khanacademy.org" target="_blank" rel="noopener" class="resource-link">📘 Khan Academy</a>
+    <a href="https://quizlet.com" target="_blank" rel="noopener" class="resource-link">📝 Quizlet</a>
+    <a href="https://www.desmos.com/calculator" target="_blank" rel="noopener" class="resource-link">🧮 Desmos Calculator</a>
+    <a href="https://phet.colorado.edu" target="_blank" rel="noopener" class="resource-link">🔬 PhET Simulations</a>
+    <a href="https://scholar.google.com" target="_blank" rel="noopener" class="resource-link">📚 Google Scholar</a>
+    <a href="https://minnetonka.schoology.com" target="_blank" rel="noopener" class="resource-link">🏫 Schoology</a>
+  </div>
+
+</div><!-- /app -->
+
+<!-- ── BOTTOM BAR ── -->
+<div class="bottom-bar">
+  <div class="bottom-meta">
+    <div class="bottom-meta-item">IP: <span id="ip-addr">…</span></div>
+    <div class="bottom-meta-item">Visits: <span id="visit-count">…</span></div>
+  </div>
+  <div class="bottom-actions">
+    <!-- intentionally minimal -->
+  </div>
+</div>
+
+<!-- ── CREATOR BAR ── -->
+<div class="creator-bar" aria-hidden="true">
+  created by sawyer schulz — 035665@mtka.org
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js" defer></script>
+<script>
+  // Init EmailJS after it loads
+  window.addEventListener('load', () => {
+    if (typeof emailjs !== 'undefined') {
+      emailjs.init({ publicKey: 'H1Q7r_KdpW6yYyqn3' });
+    }
+  });
+</script>
+<script src="app.js" defer></script>
+
+</body>
+</html>
